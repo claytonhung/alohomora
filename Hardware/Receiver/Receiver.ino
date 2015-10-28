@@ -3,7 +3,7 @@
 // Pins definition
 const int led_pin = 13;
 const int receive_pin = 12;
-int pinSpeaker = 10; 
+//int pinSpeaker = 10; 
 
 void setup(){
    Serial.begin(9600); // Debugging only
@@ -14,7 +14,7 @@ void setup(){
    vw_rx_start();
    // Set LED pin and Buzzer
    pinMode(led_pin, OUTPUT);
-   pinMode(pinSpeaker, OUTPUT);
+//   pinMode(pinSpeaker, OUTPUT);
 }
 
  
@@ -51,9 +51,9 @@ void playTone(long duration, int freq) {
     long elapsed_time = 0;
     
     while (elapsed_time < duration) {
-      digitalWrite(pinSpeaker,HIGH);
+//      digitalWrite(pinSpeaker,HIGH);
       delayMicroseconds(period / 2);
-      digitalWrite(pinSpeaker, LOW);
+//      digitalWrite(pinSpeaker, LOW);
       delayMicroseconds(period / 2);
     
       elapsed_time += (period);

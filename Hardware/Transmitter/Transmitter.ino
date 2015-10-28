@@ -1,10 +1,10 @@
 #include <VirtualWire.h>
 
-int led_pin = 13
+int led_pin = 13;
 int transmit_pin = 12;
-int pir_pin = 2;
+//int pir_pin = 2;
 int val = 0;
-int pir_state = LOW;
+//int pir_state = LOW;
 
 // #define rfTransmitPin 4  //RF Transmitter pin = digital pin 4
 // #define ledPin 13        //Onboard LED = digital pin 13
@@ -14,7 +14,7 @@ int pir_state = LOW;
    vw_set_tx_pin(transmit_pin);
    vw_setup(4000); //Transmission rate
    pinMode(led_pin, OUTPUT);
-   pinMode(pir_pin, INPUT);
+//   pinMode(pir_pin, INPUT);
 //   pinMode(rfTransmitPin, OUTPUT);     
 //   pinMode(ledPin, OUTPUT);    
  }

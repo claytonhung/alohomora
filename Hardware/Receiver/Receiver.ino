@@ -3,7 +3,6 @@
 // Pins definition
 const int led_pin = 13;
 const int receive_pin = 12;
-//int pinSpeaker = 10; 
 
 void setup(){
    Serial.begin(9600); // Debugging only
@@ -16,8 +15,6 @@ void setup(){
    pinMode(led_pin, OUTPUT);
 //   pinMode(pinSpeaker, OUTPUT);
 }
-
- 
 
 void loop(){
    uint8_t buf[VW_MAX_MESSAGE_LEN];

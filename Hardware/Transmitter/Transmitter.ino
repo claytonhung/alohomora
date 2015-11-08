@@ -2,21 +2,13 @@
 
 int led_pin = 13;
 int transmit_pin = 12;
-//int pir_pin = 2;
 int val = 0;
-//int pir_state = LOW;
-
-// #define rfTransmitPin 4  //RF Transmitter pin = digital pin 4
-// #define ledPin 13        //Onboard LED = digital pin 13
 
  void setup(){
    Serial.begin(38400);
    vw_set_tx_pin(transmit_pin);
    vw_setup(4000); //Transmission rate
-   pinMode(led_pin, OUTPUT);
-//   pinMode(pir_pin, INPUT);
-//   pinMode(rfTransmitPin, OUTPUT);     
-//   pinMode(ledPin, OUTPUT);    
+   pinMode(led_pin, OUTPUT);   
  }
 
 // void loop(){
@@ -42,7 +34,7 @@ void loop(){
   Serial.println("START");
   char msg[1] = {'0'};
   // Get sensor value
-  val = digitalRead(pir_pin);
+//  val = digitalRead(pir_pin);
   // Change message if motion is detected
   if (val == 1){
       msg[0] = '1';
@@ -51,10 +43,10 @@ void loop(){
       vw_send((uint8_t *)msg, 1);
       vw_wait_tx(); // Wait until the whole message is gone
 
-      if (pir_state == LOW) {
-        Serial.println("Motion detected!");
-        pir_state = HIGH;
-      }
+//      if (pir_state == LOW) {
+//        Serial.println("Motion detected!");
+//        pir_state = HIGH;
+//      }
    }
    else{
      msg[0] = '0';
@@ -63,10 +55,10 @@ void loop(){
      vw_send((uint8_t *)msg, 1);
      vw_wait_tx(); // Wait until the whole message is gone
 
-     if (pir_state == HIGH){
-        Serial.println("Motion ended!");
-        pir_state = LOW;
-     }
+//     if (pir_state == HIGH){
+//        Serial.println("Motion ended!");
+//        pir_state = LOW;
+//     }
    }
 }
 

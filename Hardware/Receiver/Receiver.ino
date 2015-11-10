@@ -18,7 +18,7 @@ void setup(){
    delay(1000);
    Serial.begin(9600);	// Debugging only
    Serial.println("setup");
-   pinMode(ledPin, OUTPUT);
+//   pinMode(ledPin, OUTPUT);
     // Initialise the IO and ISR
     vw_set_tx_pin(transmit_pin);
     vw_set_rx_pin(receive_pin);
@@ -48,7 +48,6 @@ void loop(){
 	}
 	Serial.println();
         digitalWrite(led_pin, LOW);
-        vw_rx_stop();
    }
 
 }

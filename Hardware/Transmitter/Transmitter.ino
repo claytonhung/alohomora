@@ -31,7 +31,7 @@ void loop(){
   if (incoming_byte == 1) {
     digitalWrite(led_pin, HIGH); // Flash light to show transmitting
     digitalWrite(transmit_pin, HIGH);
-    char msg[7] = {'h','e','l','l','o',' ','#'  };
+    char msg[7] = {'1','0','0','1','0','1','0'  };
     msg[6] = count;
     digitalWrite(led_pin, HIGH); // Flash a light to show transmitting
     vw_send((uint8_t *)msg, 7);
@@ -46,6 +46,5 @@ void loop(){
     delay(1000);
     count = count + 1;
   }
-  //      vw_send((uint8_t *)msg, strlen(msg));
 }
 

@@ -27,8 +27,8 @@ void setup(){
 byte count = 1;
 
 void loop(){
-  
-  if (incoming_byte == 1) {
+  incoming_byte = Serial.read();
+  if (incoming_byte == 'y') {
     digitalWrite(led_pin, HIGH); // Flash light to show transmitting
     digitalWrite(transmit_pin, HIGH);
     char msg[7] = {'1','0','0','1','0','1','0'  };
@@ -38,7 +38,6 @@ void loop(){
     
     if(vx_tx_active()) {
       Serial.print("THIS BOY SENT STUFF");
-      Serial.println(msg);
     }
     
     vw_wait_tx(); // Wait until the whole message is gone

@@ -28,7 +28,7 @@ byte count = 1;
 
 void loop(){
   incoming_byte = Serial.read();
-  if (incoming_byte == 'y') {
+  if (incoming_byte == 'unlock') {
     digitalWrite(led_pin, HIGH); // Flash light to show transmitting
     digitalWrite(transmit_pin, HIGH);
     char msg[7] = {'1','0','0','1','0','1','0'  };

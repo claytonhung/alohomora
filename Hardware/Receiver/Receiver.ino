@@ -1,14 +1,16 @@
 // This microcontroller will control the transmission and recieving
-// on the phone side
+// on the phone side. An infared sensor is used to detect any motion. 
+// The detection will ensure that users, along with the receiving code is 
+// allowed to unlock the door. 
+
 #include <VirtualWire.h>
 #include <AccelStepper.h>
-#define HALFSTEP 8
+#define HALFSTEP 
 
 // Pins definition
-#define led_pin 13
-#define transmit_pin 12
-#define receive_pin 2
-#define transmit_en_pin 3
+#define led_pin 13 // LED pin to blink whenever device receives something
+#define receive_pin 2 //Receiver module pin
+#define pirPin = 4 // Pin info for the Infared Sensor
 
 //Stepper Motor Pins
 #define motorPin1 8 // IN1
@@ -16,26 +18,28 @@
 #define motorPin3 10 // IN3
 #define motorPin4 11 // IN4
 
-AccelStepper stepper (HALFSTEP, motorPin1, motorPin2, motorPin3, motorPin4);
-
-// variables
-
-int turnSteps = 2100; // steps for 90 degree turn
-int stepperSpeed = 1000; // stepper speed (steps/second)
-int steps1 = 0; // keep track of the step count for motor
-
-boolean turn = false; // keep track if we are turning or not
+// Infared Sensor Pins
+// Datasheet for this PIR sensor says calibration time between 10-60 seconds
+int calibrationTime = 30; //give sensor 30 seconds to calibrate
+long unsigned int LowIn; // time when sensor outputs low impulse
+long unsigned int pause = 5000; // time the sensor has to be low before we assuming motion has stopped
+boolean lockLow = true;
+boolean takeLowTime; 
 
 void setup(){
    Serial.begin(9600); // Debugging purposes....
    Serial.println("setup");
+   digitalWrite(pirPin, LOW);
    
-   // Motor Setup
-   stepper.setMaxSpeed(2000.0);
-   stepper.setAcceleration(100.0);
-   stepper.setSpeed(200);
-   stepper.moveTo(20000);
-   
+   Serial.print("calibrating sensor ");
+     for (int i = 0; i < calibrationTime; i++) {
+       Serial.print(".");
+       delay(1000);
+     }  
+     Serial.println("done");
+     Serial.println("SENSOR ACTIVE");
+     delay(50);
+     
    // Initialise the IO and ISR
    vw_set_tx_pin(transmit_pin);
    vw_set_rx_pin(receive_pin);
@@ -49,6 +53,9 @@ byte count = 1;
 
 void loop(){
   
+  if (digitalRead(pirPin) == HIGH) {
+    
+  }
 // --- RECEIVING PART STARTS ---
    uint8_t buf[VW_MAX_MESSAGE_LEN];
    uint8_t buflen = VW_MAX_MESSAGE_LEN;
@@ -66,23 +73,27 @@ void loop(){
 	    Serial.print(' ');
 	}
 	Serial.println();
-        transmitCodeBack();
-//        digitalWrite(led_pin, LOW); // Turn off LED light 
+//        transmitCodeBack();
         
    }
 // --- RECEIVING PART ENDS ---
-
-// --- TRANSMITTING PART STARTS ---
-
-
-// --- TRANSMITTING PART ENDS ---
 }
 
+
+void motionDetected() {
+  
+}
+
+void 
 void lockDoor () {
 
 }
 
 void unlockDoor() {
+  Serial.print("UNLOCKING DOOR");
+  delay(1000);
+  Serial.println("Stepper distance: " + stepper.distanceToGo());
+  stepper.moveTo(-stepper.currentPosition());
   if(stepper.distanceToGo() == 0) {
     stepper.moveTo(-stepper.currentPosition());
   }

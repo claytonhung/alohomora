@@ -80,6 +80,7 @@ void loop(){
     Serial.println();
     digitalWrite(led_pin, LOW);
   }
+  // --- RECEIVING PART END ---
   
 }
 

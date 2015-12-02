@@ -19,9 +19,9 @@ void setup(){
 byte count = 1;
 
 void loop(){
-  incoming_byte = Serial.read();
+  phone_data = Serial.read();
   
-  if (incoming_byte == 'l') {
+  if (phone_data == 'l') {
     // Get first letter to show the transission 
     // This device sends a message with a start of '111'
     // The second device sends a message with a start of '000'
@@ -38,10 +38,10 @@ void loop(){
     
     vw_wait_tx(); // Wait until the whole message is gone
     digitalWrite(led_pin, LOW);
-    incoming_byte = 'w'; // Wrong set of pin variable
+    phone_data = 'w'; // Wrong set of pin variable
     count = count + 1;
     
-  } else if (incoming_byte == 'u') {
+  } else if (phone_data == 'u') {
       digitalWrite(led_pin, HIGH);
       digitalWrite(transmit_pin, HIGH);
       char msg[7] = {'1'};
@@ -55,8 +55,10 @@ void loop(){
       
       vw_wait_tx();
       digitalWrite(led_pin, LOW);
-      incoming_byte = 'w';
+      phone_data = 'w';
       count = count + 1;
+  } else {
+    constantlySend(); //this is being sent to show that this phone is correct phone for the receiving end
   }
 }
 
@@ -67,12 +69,11 @@ void constantlySend () {
     vw_send((uint8_t *)msg, 7);
     
     if(vx_tx_active()) {
-      Serial.print("Request for lock");
     }
     
     vw_wait_tx(); // Wait until the whole message is gone
     digitalWrite(led_pin, LOW);
-    incoming_byte = 'w'; // Wrong set of pin variable
+    phone_data = 'w'; // Wrong set of pin variable
     count = count + 1;
 }
 

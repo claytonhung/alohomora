@@ -13,7 +13,6 @@
 // Pins definition
 #define led_pin 13 // LED pin to blink whenever device receives something
 #define receive_pin 2 //Receiver module pin
-#define pirPin 4 // Pin info for the Infared Sensor
 
 //Stepper Motor Pins
 #define motorPin1 8 // IN4
@@ -21,6 +20,7 @@
 #define motorPin3 10 // IN2
 #define motorPin4 11 // IN1
 
+int pirPin = 4; //Pin info for the Infared Sensor (INPUT)
 int steps = 0;
 boolean directionOfMotor = true;
 unsigned long lastTime;
@@ -30,7 +30,7 @@ long time;
 
 // Infared Sensor Pins
 // Datasheet for this PIR sensor says calibration time between 10-60 seconds
-int calibrationTime = 30; //give sensor 30 seconds to calibrate
+int calibrationTime = 10; //give sensor 30 seconds to calibrate
 long unsigned int timeOfNoDetection; // time when sensor outputs low impulse
 long unsigned int pause = 5000; // time the sensor has to be low before we assuming motion has stopped
 boolean noDetection = true; // see if sensor detected any motion (LOCKLOW)
@@ -39,16 +39,17 @@ boolean beginTimer; // start the timer
 void setup(){
    Serial.begin(9600); // Debugging purposes....
    Serial.println("setup");
-//   digitalWrite(pirPin, LOW);
+   pinMode(pirPin, INPUT);
+   digitalWrite(pirPin, LOW);
    
    Serial.print("calibrating sensor ");
-     for (int i = 0; i < calibrationTime; i++) {
-       Serial.print(".");
-       delay(1000);
-     }  
-     Serial.println("done");
-     Serial.println("SENSOR ACTIVE");
-     delay(50);
+   for (int i = 0; i < calibrationTime; i++) {
+     Serial.print(".");
+     delay(1000);
+   }  
+   Serial.println("done");
+   Serial.println("SENSOR ACTIVE");
+   delay(50);
      
    // Initialise the IO and ISR
 //   vw_set_tx_pin(transmit_pin);
@@ -65,11 +66,10 @@ void loop(){
   // --- RECEIVING PART STARTS ---
    uint8_t buf[VW_MAX_MESSAGE_LEN];
    uint8_t buflen = VW_MAX_MESSAGE_LEN;
-  
   //Check if Motion is detected AND message can be received from the transmitter
-  if (digitalRead(pirPin) == HIGH && vw_get_message(buf, &buflen)) {
+  if (digitalRead(pirPin) == HIGH) {
     vw_wait_rx(); //wait for full message to be received
-    
+    Serial.print("Motion1!");
     if(noDetection) {
       noDetection = false;
       Serial.print("Motion detected at ");
@@ -104,7 +104,7 @@ void lockDoor () {
   while(stepsLeft > 0) {
     currentMillis = micros();
     if(currentMillis - lastTime >= 1000) {
-      movement(1);
+      motorMove(1);
       time = time + micros() - lastTime;
       lastTime = micros();
       stepsLeft--;
@@ -114,85 +114,86 @@ void lockDoor () {
     delay(2000);
     directionOfMotor =! directionOfMotor;
     stepsLeft = 2047;
+  }
 }
 
-void movement(int xw){
+void motorMove(int xw) {
   for(int x = 0; x < xw; x++) {
-    switch(Steps) {
+    switch(steps) {
       case 0:
-       digitalWrite(IN1, LOW);
-       digitalWrite(IN2, LOW);
-       digitalWrite(IN3, LOW);
-       digitalWrite(IN4, HIGH);
+       digitalWrite(motorPin1, LOW);
+       digitalWrite(motorPin2, LOW);
+       digitalWrite(motorPin3, LOW);
+       digitalWrite(motorPin4, HIGH);
       break;
       case 1:
-       digitalWrite(IN1, LOW); 
-       digitalWrite(IN2, LOW);
-       digitalWrite(IN3, HIGH);
-       digitalWrite(IN4, HIGH);
+       digitalWrite(motorPin1, LOW); 
+       digitalWrite(motorPin2, LOW);
+       digitalWrite(motorPin3, HIGH);
+       digitalWrite(motorPin4, HIGH);
      break; 
      case 2:
-       digitalWrite(IN1, LOW); 
-       digitalWrite(IN2, LOW);
-       digitalWrite(IN3, HIGH);
-       digitalWrite(IN4, LOW);
+       digitalWrite(motorPin1, LOW); 
+       digitalWrite(motorPin2, LOW);
+       digitalWrite(motorPin3, HIGH);
+       digitalWrite(motorPin4, LOW);
      break; 
      case 3:
-       digitalWrite(IN1, LOW); 
-       digitalWrite(IN2, HIGH);
-       digitalWrite(IN3, HIGH);
-       digitalWrite(IN4, LOW);
+       digitalWrite(motorPin1, LOW); 
+       digitalWrite(motorPin2, HIGH);
+       digitalWrite(motorPin3, HIGH);
+       digitalWrite(motorPin4, LOW);
      break; 
      case 4:
-       digitalWrite(IN1, LOW); 
-       digitalWrite(IN2, HIGH);
-       digitalWrite(IN3, LOW);
-       digitalWrite(IN4, LOW);
+       digitalWrite(motorPin1, LOW); 
+       digitalWrite(motorPin2, HIGH);
+       digitalWrite(motorPin3, LOW);
+       digitalWrite(motorPin4, LOW);
      break; 
      case 5:
-       digitalWrite(IN1, HIGH); 
-       digitalWrite(IN2, HIGH);
-       digitalWrite(IN3, LOW);
-       digitalWrite(IN4, LOW);
+       digitalWrite(motorPin1, HIGH); 
+       digitalWrite(motorPin2, HIGH);
+       digitalWrite(motorPin3, LOW);
+       digitalWrite(motorPin4, LOW);
      break; 
      case 6:
-       digitalWrite(IN1, HIGH); 
-       digitalWrite(IN2, LOW);
-       digitalWrite(IN3, LOW);
-       digitalWrite(IN4, LOW);
+       digitalWrite(motorPin1, HIGH); 
+       digitalWrite(motorPin2, LOW);
+       digitalWrite(motorPin3, LOW);
+       digitalWrite(motorPin4, LOW);
      break; 
      case 7:
-       digitalWrite(IN1, HIGH); 
-       digitalWrite(IN2, LOW);
-       digitalWrite(IN3, LOW);
-       digitalWrite(IN4, HIGH);
+       digitalWrite(motorPin1, HIGH); 
+       digitalWrite(motorPin2, LOW);
+       digitalWrite(motorPin3, LOW);
+       digitalWrite(motorPin4, HIGH);
      break; 
      default:
-       digitalWrite(IN1, LOW); 
-       digitalWrite(IN2, LOW);
-       digitalWrite(IN3, LOW);
-       digitalWrite(IN4, LOW);
+       digitalWrite(motorPin1, LOW); 
+       digitalWrite(motorPin2, LOW);
+       digitalWrite(motorPin3, LOW);
+       digitalWrite(motorPin4, LOW);
      break; 
    }
-   SetDirection();
+   setDirection();
   }
 }
 
 void setDirection() {
   if(directionOfMotor == 1) {
-    Steps++;
+    steps++;
   }
   
   if(directionOfMotor == 0) {
-    Steps--;
+    steps--;
   }
   
-  if(Steps>7) {
-    Steps = 0;
+  if(steps>7) {
+    steps = 0;
   }
   
-  if(Steps<0) {
-    Steps = 7; 
+  if(steps<0) {
+    steps = 7; 
   }
 }
 

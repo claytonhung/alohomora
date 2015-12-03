@@ -63,17 +63,19 @@ void loop(){
 }
 
 void constantlySend () {
-   char msg[7] = {'1','1','1','1','0','1','0'  };
+   char msg[1] = {'2'};
     msg[6] = count;
     digitalWrite(led_pin, HIGH); // Flash a light to show transmitting
     vw_send((uint8_t *)msg, 7);
     
     if(vx_tx_active()) {
+      Serial.print("Request for lock");
     }
     
     vw_wait_tx(); // Wait until the whole message is gone
     digitalWrite(led_pin, LOW);
     phone_data = 'w'; // Wrong set of pin variable
     count = count + 1;
+    delay(1000);
 }
 

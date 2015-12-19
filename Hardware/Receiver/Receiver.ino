@@ -8,12 +8,21 @@
 #include <VirtualWire.h>
 // Pins Definition
 #define receive_pin 2 //Receiver module pin
-//Stepper Motor Pins
+//Stepper Motor
 #define motorPin1 11 // IN1
 #define motorPin2 10 // IN2
 #define motorPin3 9 // IN3
 #define motorPin4 8 // IN4
-int pirPin = 4; //Pin info for the Infared Sensor (INPUT)
+int pirPin = 4;    //the digital pin connected to the PIR sensor's output
+
+int calibrationTime = 10;
+long unsigned int lowIn; // time when sensor outputs a low impulse
+
+//the amount of milliseconds the sensor has to be low
+//before we assume all motion has stopped
+long unsigned int pause = 2000;
+boolean lockLow = true;
+boolean takeLowTime;
 
 int steps = 0;
 boolean directionOfMotor = true;
@@ -22,78 +31,111 @@ unsigned long currentMillis;
 int stepsLeft = 2047;
 long time;
 
-// Infared Sensor Pins
-// Datasheet for this PIR sensor says calibration time between 10-60 seconds
-int calibrationTime = 10; //give sensor 30 seconds to calibrate
-long unsigned int timeOfNoDetection; // time when sensor outputs low impulse
-long unsigned int pause = 5000; // time the sensor has to be low before we assuming motion has stopped
-boolean noDetection = true; // see if sensor detected any motion (LOCKLOW)
-boolean beginTimer; // start the timer
 
+/////////////////////////////
+//SETUP
 void setup(){
-   Serial.begin(9600); // Debugging purposes.....................
-   pinMode(pirPin, INPUT);
-   digitalWrite(pirPin, LOW); // Set the sensor to low
+  Serial.begin(9600);
+  pinMode(pirPin, INPUT);
+  digitalWrite(pirPin, LOW); // Set the sensor to low
 
-   pinMode(motorPin1, OUTPUT);
-   pinMode(motorPin2, OUTPUT);
-   pinMode(motorPin3, OUTPUT);
-   pinMode(motorPin4, OUTPUT);
+  pinMode(motorPin1, OUTPUT);
+  pinMode(motorPin2, OUTPUT);
+  pinMode(motorPin3, OUTPUT);
+  pinMode(motorPin4, OUTPUT);
 
-   //give sensor some time to calibrate
-   Serial.print("calibrating sensor ");
-   for (int i = 0; i < calibrationTime; i++) {
-     Serial.print(".");
-     delay(1000);
-   }
-   Serial.println("done");
-   Serial.println("SENSOR ACTIVE");
-   delay(50);
+  //give the sensor some time to calibrate
+  Serial.print("calibrating sensor ");
+    for(int i = 0; i < calibrationTime; i++){
+      Serial.print(".");
+      delay(1000);
+      }
+    Serial.println(" done");
+    Serial.println("SENSOR ACTIVE");
+    delay(50);
 
-   // Initialise the IO and ISR
-   vw_set_rx_pin(receive_pin);
-   vw_setup(2000);	 // Bits per sec
-   vw_rx_start();       // Start the receiver PLL running
-}
+  // Initialize the receiver module with Virtual Wire
+  vw_set_rx_pin(receive_pin);
+  vw_setup(3000);
+  vw_rx_start();
+  }
 
-byte count = 1;
-
+////////////////////////////
+//LOOP
 void loop(){
-  // --- RECEIVING PART STARTS ---
-   uint8_t buf[VW_MAX_MESSAGE_LEN];
-   uint8_t buflen = VW_MAX_MESSAGE_LEN;
-  //Check if Motion is detected AND message can be received from the transmitter
-  if (digitalRead(pirPin) == HIGH) {
-    vw_wait_rx(); //wait for full message to be received
-    if(noDetection) {
-      noDetection = false;
-      Serial.println("---");
-      Serial.print("Motion detected at ");
-      Serial.print(millis()/1000); //the time motion was detected
-      Serial.print(" seconds");
-      delay(100);
-    }
-    beginTimer = true;
-  }
+     uint8_t buf[VW_MAX_MESSAGE_LEN];
+     uint8_t buflen = VW_MAX_MESSAGE_LEN;
+     if(digitalRead(pirPin) == HIGH && vw_get_message(buf, &buflen)){
+//       vw_wait_rx();
+//       	Serial.print("Got: ");
+//	for (int i = 0; i < buflen; i++)
+//	{
+//	    Serial.print(buf[i], HEX);
+//	    Serial.print(' ');
+//	}
+//	Serial.println();
+       if(lockLow){
+         //makes sure we wait for a transition to LOW before any further output is made:
+         lockLow = false;
+         Serial.println("---");
+         Serial.print("motion detected at ");
+         Serial.print(millis()/1000);
+         Serial.println(" sec");
+         delay(50);
+         }
+         takeLowTime = true; 
+         directionOfMotor = true;   
+         lockDoor();
+     }
+//     } else if(vw_get_message(buf, &buflen)) {
+////       vw_wait_rx();
+////       Serial.print("Got: ");
+////       
+////       for(int i = 0; i < buflen; i++) {
+////         Serial.print(buf[i], HEX);
+////         Serial.print(' ');
+////       }
+////       
+////       Serial.println();
+////       byte lockOrUnlock = (buf[1], HEX);
+////       if (lockOrUnlock == 16) {
+////         Serial.print("UNLOCK BY ITSELF");
+////         directionOfMotor = true;
+////         lockDoor();
+////       } 
+//       
+//     }
 
-  if (digitalRead(pirPin) == LOW) {
-    if(beginTimer) {
-      timeOfNoDetection = millis(); // save time of transition from high to low
-      beginTimer = false; //reset this so its only done at the start of a LOW phase
-    }
-    // Check if sensor is not being used (LOW) for more than the "pause" time
-    // we believe there is no motion that will happen again
-    if(!noDetection && millis() - timeOfNoDetection > pause) {
-      //ENTER SLEEP MODE SON
-      noDetection = true;
-      Serial.print("motion ended at ");
-      Serial.print((millis() - pause/1000));
-      Serial.println(" sec");
-      delay(100);
-    }
+     if(digitalRead(pirPin) == LOW){
+       if (vw_get_message(buf, &buflen)) {
+         vw_wait_rx();
+         Serial.print("Gotthem: ");
+         for(int i =0; i < buflen; i++) {
+           Serial.print(buf[i]);
+           Serial.print(' ');
+         }
+         Serial.println();
+       }
+       if(takeLowTime){
+        lowIn = millis();          //save the time of the transition from high to LOW
+        takeLowTime = false;       //make sure this is only done at the start of a LOW phase
+        }
+       //if the sensor is low for more than the given pause,
+       //we assume that no more motion is going to happen
+       if(!lockLow && millis() - lowIn > pause){
+           //makes sure this block of code is only executed again after
+           //a new motion sequence has been detected
+           lockLow = true;
+           Serial.print("motion ended at ");      //output
+           Serial.print((millis() - pause)/1000);
+           Serial.println(" sec");
+           delay(50);
+           }
+     }
+     
+       
+       
   }
-// --- RECEIVING PART ENDS ---
-}
 
 void lockDoor () {
   while(stepsLeft > 0) {
@@ -192,51 +234,5 @@ void setDirection() {
   }
 }
 
-// GARBAGE CODE
-//   // Check if a password message has been received
-//    if (vw_get_message(buf, &buflen)) {
-//      int i;
-//        vw_wait_rx();
-//        digitalWrite(led_pin, HIGH); // Turn on LED light when message received
-//
-////	Serial.print("Got: ");
-////	for (i = 0; i < buflen; i++)
-////	{
-////	    Serial.print(buf[i], HEX);
-////	    Serial.print(' ');
-////	}
-////	Serial.println();
-//
-//   }
 
 
-
-
-// UNLOCK CODE
-//  Serial.print("UNLOCKING DOOR");
-//  delay(1000);
-//  Serial.println("Stepper distance: " + stepper.distanceToGo());
-//  stepper.moveTo(-stepper.currentPosition());
-//  if(stepper.distanceToGo() == 0) {
-//    stepper.moveTo(-stepper.currentPosition());
-//  }
-//  stepper.run();
-
-
-
-//void unlockDoor() {
-//
-//}
-
-//void transmitCodeBack() {
-//  char msg[7] = {'0', '1', '1', '1', '0', '1', '0' };
-//  msg[6] = count;
-//  vw_send((uint8_t *)msg, 7);
-//
-//  if (vx_tx_active()) {
-//    Serial.print("Sent.");
-//  }
-//
-//  vw_wait_tx();
-//  count = count + 1;
-//}

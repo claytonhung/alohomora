@@ -12,7 +12,7 @@ void setup(){
   pinMode(led_pin, OUTPUT); //initialize as OUTPUT
   
   // Initialise the IO and ISR
-  vw_setup(2000); //set the bps for this library
+  vw_setup(3000); //set the bps for this library
   vw_set_tx_pin(transmit_pin); //initialize the pin 
 }
 
@@ -27,10 +27,11 @@ void loop(){
     // The second device sends a message with a start of '000'
     digitalWrite(led_pin, HIGH); // Flash light to show transmitting
     digitalWrite(transmit_pin, HIGH);
-    char msg[7] = {'1','1','1','1','0','1','0'  };
-    msg[6] = count;
+//    char msg[7] = {'0', '1'};
+    int msg = 33;
+    // msg[6] = count;
     digitalWrite(led_pin, HIGH); // Flash a light to show transmitting
-    vw_send((uint8_t *)msg, 7);
+    vw_send((uint8_t *)msg, 4);
     
     if(vx_tx_active()) {
       Serial.print("Request for lock");
@@ -69,13 +70,11 @@ void constantlySend () {
     vw_send((uint8_t *)msg, 7);
     
     if(vx_tx_active()) {
-      Serial.print("Request for lock");
-    }
-    
+    }   
     vw_wait_tx(); // Wait until the whole message is gone
     digitalWrite(led_pin, LOW);
     phone_data = 'w'; // Wrong set of pin variable
     count = count + 1;
-    delay(1000);
+    delay(2000);
 }
 

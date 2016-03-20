@@ -3,9 +3,10 @@
   "description": "provide access for users",
   "version": "0.0.1",
   "dependencies": {
-    "express": "3.x",
-    "body-parser": "",
     "MD5": "",
-    "mysql": ""
+    "body-parser": "",
+    "express": "3.x",
+    "mysql": "",
+    "node-json-db": "^0.6.5"
   }
 }

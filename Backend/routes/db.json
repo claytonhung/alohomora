@@ -1,0 +1,14 @@
+{ "data": {
+    "user": {
+        "name": "Andy",
+        "username": "canuckz_RULZ",
+        "lockID": 1244141
+    },
+    "key": {
+        "type": "owner",
+        "expire_date": "date",
+        "address": "lester",
+        "userID": 1
+    },
+  }
+}

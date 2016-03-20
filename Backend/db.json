@@ -1,0 +1,50 @@
+{
+    "users": [
+        {
+            "userID": 1,
+            "name": "Andy",
+            "username": "canucks_rulz",
+            "keyID": [
+                1
+            ],
+            "unlockID": [
+                1
+            ]
+        },
+        {
+            "userID": 2,
+            "name": "Bix",
+            "username": "canucks_rulz",
+            "keyID": [
+                1
+            ],
+            "unlockID": [
+                1
+            ]
+        }
+    ],
+    "keys": [
+        {
+            "keyID": 1,
+            "expire_date": 20160401,
+            "address": "261 Lester",
+            "userID": [
+                1
+            ],
+            "unlockID": [
+                1
+            ]
+        },
+        {
+            "keyID": 2,
+            "expire_date": 20160401,
+            "address": "261 Lester",
+            "userID": [
+                1
+            ],
+            "unlockID": [
+                1
+            ]
+        }
+    ]
+}

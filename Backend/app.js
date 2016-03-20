@@ -3,8 +3,10 @@ var mysql = require('./routes/sqlConnection');
 var path = require('path');
 var bodyParser = require('body-parser');
 var handler = require('./routes/handler');
+var nodeDB = require('./routes/nodeDB');
 var app = express();
-
+var http = require('http');
+var server = http.createServer(app);
 
 var allowCrossDomain = function(req, res, next) {
     res.header('Access-Control-Allow-Origin', '*');
@@ -32,3 +34,14 @@ app.post('/api/v1/lock', handler.updateLock);
 app.post('/api/v1/key', handler.updateKey);
 
 app.listen(3000);
+
+app.get('/Andy', function(req, res) {
+    res.send(nodeDB.getData(0));
+});
+
+//app.get('/avpi/v1/user', nodeDB.logData(0));
+
+server.listen(3000, 'localhost');
+server.on('listening', function() {
+    console.log('Express server started on port %s at %s', server.address().port, server.address().address);
+});

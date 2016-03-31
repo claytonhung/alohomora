@@ -1,141 +1,191 @@
-// This microcontroller will control the transmission and recieving
-// on the phone side. An infared sensor is used to detect any motion.
-// The detection will ensure that users, along with the receiving code is
-// allowed to unlock the door.
+#include <SPI.h>
+#include "nRF24L01.h"
+#include "RF24.h"
 
-// For Current Implementation
-// Use detect based on the users signal
-#include <VirtualWire.h>
-// Pins Definition
-#define receive_pin 2 //Receiver module pin
-//Stepper Motor
-#define motorPin1 11 // IN1
-#define motorPin2 10 // IN2
-#define motorPin3 9 // IN3
-#define motorPin4 8 // IN4
-int pirPin = 4;    //the digital pin connected to the PIR sensor's output
+// Set up nRF24L01 radio on SPI bus plus pins 2 & 5
+// MOSI 11
+// SCK 13
+// MISO 12
+// CSN 2
+// CE 5
+RF24 radio(5,2);
 
-int calibrationTime = 10;
-long unsigned int lowIn; // time when sensor outputs a low impulse
-
-//the amount of milliseconds the sensor has to be low
-//before we assume all motion has stopped
-long unsigned int pause = 2000;
-boolean lockLow = true;
-boolean takeLowTime;
+#define motorPin1 10 // IN1
+#define motorPin2 9 // IN2
+#define motorPin3 8 // IN3
+#define motorPin4 7 // IN4
+int pir = 6;
+int stateLock = 4; // red
+int stateunLock = 3;  // green
 
 int steps = 0;
-boolean directionOfMotor = true;
+boolean directionOfMotor = true; //true = locked
 unsigned long lastTime;
 unsigned long currentMillis;
-int stepsLeft = 2047;
+//int stepsLeft = 2047;
+int stepsLeft = 2591;
 long time;
 
+static char unlock_char[] = "UNLOCK";
+static char lock_char[] = "LOCK";
+static char distance_char[] = "ABCDEFGHIJASBFSAOEJFASQWRQWR";
 
-/////////////////////////////
-//SETUP
-void setup(){
-  Serial.begin(9600);
-  pinMode(pirPin, INPUT);
-  digitalWrite(pirPin, LOW); // Set the sensor to low
+// Radio pipe addresses for the 2 nodes to communicate.
+const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL };
+
+// The various roles supported by this sketch
+typedef enum { role_ping_out = 1, role_pong_back } role_e;
+// The debug-friendly names of those roles
+const char* role_friendly_name[] = { "invalid", "Ping out", "Pong back"};
+// The role of the current running sketch
+role_e role;
+
+char phoneData = 'n';
+static char phone_send[] = "LOCKUNLOCK";
+
+const int min_payload_size = 4;
+//const int max_payload_size = 32;
+const int max_payload_size = 69;
+const int payload_size_increments_by = 1;
+int next_payload_size = min_payload_size;
+
+char receive_payload[max_payload_size+1]; // +1 to allow room for a terminating NULL char
+
+void setup(void)
+{
+  delay(20); // Just to get a solid reading on the role pin
+
+    role = role_pong_back;
+//  role = role_ping_out;
 
   pinMode(motorPin1, OUTPUT);
   pinMode(motorPin2, OUTPUT);
   pinMode(motorPin3, OUTPUT);
   pinMode(motorPin4, OUTPUT);
+  pinMode(pir, INPUT);
+  pinMode(stateLock, OUTPUT);
+  pinMode(stateunLock, OUTPUT);
+  digitalWrite(stateLock, HIGH);
+  digitalWrite(stateunLock, LOW);
+  Serial.begin(9600);
+  Serial.print(F("ROLE: "));
+  Serial.println(role_friendly_name[role]);
 
-  //give the sensor some time to calibrate
-  Serial.print("calibrating sensor ");
-    for(int i = 0; i < calibrationTime; i++){
-      Serial.print(".");
-      delay(1000);
+  radio.begin();
+  radio.enableDynamicPayloads(); // enable dynamic payloads
+  radio.setRetries(5,15); // increase delay between retries & # of retries
+
+  // This simple sketch opens two pipes for these two nodes to communicate
+  // back and forth.
+  // Open 'our' pipe for writing
+  // Open the 'other' pipe for reading, in position #1 (we can have up to 5 pipes open for reading)
+
+  if ( role == role_ping_out )
+  {
+    radio.openWritingPipe(pipes[0]);
+    radio.openReadingPipe(1,pipes[1]);
+  }
+  else
+  {
+    radio.openWritingPipe(pipes[1]);
+    radio.openReadingPipe(1,pipes[0]);
+  }
+
+  radio.startListening();
+  radio.printDetails();
+}
+
+void loop(void)
+{
+  // Pong back role.  Receive each packet, dump it out, and send it back
+  char c;
+  if (Serial.available()) {
+    c = Serial.read();
+    if (c == 'l') {
+            directionOfMotor = true;
+      lockDoor(); //unlock first
+      delay(3000);  
+     lockDoor(); //lock now
+    } else if (c == 'u') {
+      if (!directionOfMotor) {
+            Serial.println("UNLOCK WITH PHONE");
+            lockDoor(); // Lock Door
+          }
+    }
+  }
+  
+  if ( role == role_pong_back )
+  {
+    // if there is data ready
+    while ( radio.available() )
+    {
+
+      // Fetch the payload, and see if this was the last one.
+      uint8_t len = radio.getDynamicPayloadSize();
+
+      // If a corrupt dynamic payload is received, it will be flushed
+      if(!len){
+        continue; 
       }
-    Serial.println(" done");
-    Serial.println("SENSOR ACTIVE");
-    delay(50);
 
-  // Initialize the receiver module with Virtual Wire
-  vw_set_rx_pin(receive_pin);
-  vw_setup(3000);
-  vw_rx_start();
-  }
+      radio.read( receive_payload, len );
 
-////////////////////////////
-//LOOP
-void loop(){
-     uint8_t buf[VW_MAX_MESSAGE_LEN];
-     uint8_t buflen = VW_MAX_MESSAGE_LEN;
-     if(digitalRead(pirPin) == HIGH && vw_get_message(buf, &buflen)){
-//       vw_wait_rx();
-//       	Serial.print("Got: ");
-//	for (int i = 0; i < buflen; i++)
-//	{
-//	    Serial.print(buf[i], HEX);
-//	    Serial.print(' ');
-//	}
-//	Serial.println();
-       if(lockLow){
-         //makes sure we wait for a transition to LOW before any further output is made:
-         lockLow = false;
-         Serial.println("---");
-         Serial.print("motion detected at ");
-         Serial.print(millis()/1000);
-         Serial.println(" sec");
-         delay(50);
-         }
-         takeLowTime = true; 
-         directionOfMotor = true;   
-         lockDoor();
-     }
-//     } else if(vw_get_message(buf, &buflen)) {
-////       vw_wait_rx();
-////       Serial.print("Got: ");
-////       
-////       for(int i = 0; i < buflen; i++) {
-////         Serial.print(buf[i], HEX);
-////         Serial.print(' ');
-////       }
-////       
-////       Serial.println();
-////       byte lockOrUnlock = (buf[1], HEX);
-////       if (lockOrUnlock == 16) {
-////         Serial.print("UNLOCK BY ITSELF");
-////         directionOfMotor = true;
-////         lockDoor();
-////       } 
-//       
-//     }
+      // Put a zero at the end for easy printing
+      receive_payload[len] = 0;
 
-     if(digitalRead(pirPin) == LOW){
-       if (vw_get_message(buf, &buflen)) {
-         vw_wait_rx();
-         Serial.print("Gotthem: ");
-         for(int i =0; i < buflen; i++) {
-           Serial.print(buf[i]);
-           Serial.print(' ');
-         }
-         Serial.println();
-       }
-       if(takeLowTime){
-        lowIn = millis();          //save the time of the transition from high to LOW
-        takeLowTime = false;       //make sure this is only done at the start of a LOW phase
+      // Spew it
+      Serial.print(F("Got RES size="));
+      Serial.print(len);
+      Serial.print(F(" value="));
+      Serial.println(receive_payload);
+      
+      if (strcmp(receive_payload, unlock_char) ==0) {
+        if (directionOfMotor) {
+          Serial.println("UNLOCK WITH PHONE");
+          lockDoor(); // It's actually unlock
+          digitalWrite(stateunLock, LOW);
+          digitalWrite(stateLock, HIGH);
         }
-       //if the sensor is low for more than the given pause,
-       //we assume that no more motion is going to happen
-       if(!lockLow && millis() - lowIn > pause){
-           //makes sure this block of code is only executed again after
-           //a new motion sequence has been detected
-           lockLow = true;
-           Serial.print("motion ended at ");      //output
-           Serial.print((millis() - pause)/1000);
-           Serial.println(" sec");
-           delay(50);
-           }
-     }
-     
-       
-       
+      }
+      
+      if (strcmp(receive_payload, lock_char) == 0) {
+        if (!directionOfMotor) {
+          Serial.println("LOCK WITH PHONE");
+          lockDoor(); // Lock Door
+          digitalWrite(stateLock, LOW);
+          digitalWrite(stateunLock, HIGH);
+        }
+      }
+
+      // THIS IS WHERE WE UNLOCK THE DOOR
+      // THIS IS WHERE WE UNLOCK THE DOOR
+      // THIS IS WHERE WE UNLOCK THE DOOR            
+      // THIS IS WHERE WE UNLOCK THE DOOR
+      // THIS IS WHERE WE UNLOCK THE DOOR
+      if (strcmp(receive_payload, distance_char) == 0 && (digitalRead(pir) == HIGH)) {
+        Serial.println("PROXIMITY UNLOCK");
+        directionOfMotor = true;
+        lockDoor(); //unlock first
+        digitalWrite(stateLock, LOW);
+        digitalWrite(stateunLock, HIGH);
+        delay(5000); // let door be able to "rest" before locking again 
+        lockDoor(); //lock now
+        digitalWrite(stateLock, HIGH);
+        digitalWrite(stateunLock, LOW);
+      }
+
+      // First, stop listening so we can talk
+      radio.stopListening();
+
+      // Send the final one back.
+      radio.write( receive_payload, len );
+      Serial.println(F("Sent response."));
+
+      // Now, resume listening so we catch the next packets.
+      radio.startListening();
+    }
   }
+}
 
 void lockDoor () {
   while(stepsLeft > 0) {
@@ -147,72 +197,73 @@ void lockDoor () {
       stepsLeft--;
     }
   }
-    Serial.println(time);
-    Serial.println("Uhh....wait.....");
-    delay(2000);
-    directionOfMotor =! directionOfMotor;
-    stepsLeft = 2047;
+  Serial.println(time);
+  Serial.println("Uhh....wait.....");
+  delay(2000);
+  directionOfMotor =! directionOfMotor;
+  //    stepsLeft = 2047;
+  stepsLeft = 2591;
 }
 
 void motorMove(int xw) {
   for(int x = 0; x < xw; x++) {
     switch(steps) {
-      case 0:
-       digitalWrite(motorPin1, LOW);
-       digitalWrite(motorPin2, LOW);
-       digitalWrite(motorPin3, LOW);
-       digitalWrite(motorPin4, HIGH);
+    case 0:
+      digitalWrite(motorPin1, LOW);
+      digitalWrite(motorPin2, LOW);
+      digitalWrite(motorPin3, LOW);
+      digitalWrite(motorPin4, HIGH);
       break;
-      case 1:
-       digitalWrite(motorPin1, LOW);
-       digitalWrite(motorPin2, LOW);
-       digitalWrite(motorPin3, HIGH);
-       digitalWrite(motorPin4, HIGH);
-     break;
-     case 2:
-       digitalWrite(motorPin1, LOW);
-       digitalWrite(motorPin2, LOW);
-       digitalWrite(motorPin3, HIGH);
-       digitalWrite(motorPin4, LOW);
-     break;
-     case 3:
-       digitalWrite(motorPin1, LOW);
-       digitalWrite(motorPin2, HIGH);
-       digitalWrite(motorPin3, HIGH);
-       digitalWrite(motorPin4, LOW);
-     break;
-     case 4:
-       digitalWrite(motorPin1, LOW);
-       digitalWrite(motorPin2, HIGH);
-       digitalWrite(motorPin3, LOW);
-       digitalWrite(motorPin4, LOW);
-     break;
-     case 5:
-       digitalWrite(motorPin1, HIGH);
-       digitalWrite(motorPin2, HIGH);
-       digitalWrite(motorPin3, LOW);
-       digitalWrite(motorPin4, LOW);
-     break;
-     case 6:
-       digitalWrite(motorPin1, HIGH);
-       digitalWrite(motorPin2, LOW);
-       digitalWrite(motorPin3, LOW);
-       digitalWrite(motorPin4, LOW);
-     break;
-     case 7:
-       digitalWrite(motorPin1, HIGH);
-       digitalWrite(motorPin2, LOW);
-       digitalWrite(motorPin3, LOW);
-       digitalWrite(motorPin4, HIGH);
-     break;
-     default:
-       digitalWrite(motorPin1, LOW);
-       digitalWrite(motorPin2, LOW);
-       digitalWrite(motorPin3, LOW);
-       digitalWrite(motorPin4, LOW);
-     break;
-   }
-   setDirection();
+    case 1:
+      digitalWrite(motorPin1, LOW);
+      digitalWrite(motorPin2, LOW);
+      digitalWrite(motorPin3, HIGH);
+      digitalWrite(motorPin4, HIGH);
+      break;
+    case 2:
+      digitalWrite(motorPin1, LOW);
+      digitalWrite(motorPin2, LOW);
+      digitalWrite(motorPin3, HIGH);
+      digitalWrite(motorPin4, LOW);
+      break;
+    case 3:
+      digitalWrite(motorPin1, LOW);
+      digitalWrite(motorPin2, HIGH);
+      digitalWrite(motorPin3, HIGH);
+      digitalWrite(motorPin4, LOW);
+      break;
+    case 4:
+      digitalWrite(motorPin1, LOW);
+      digitalWrite(motorPin2, HIGH);
+      digitalWrite(motorPin3, LOW);
+      digitalWrite(motorPin4, LOW);
+      break;
+    case 5:
+      digitalWrite(motorPin1, HIGH);
+      digitalWrite(motorPin2, HIGH);
+      digitalWrite(motorPin3, LOW);
+      digitalWrite(motorPin4, LOW);
+      break;
+    case 6:
+      digitalWrite(motorPin1, HIGH);
+      digitalWrite(motorPin2, LOW);
+      digitalWrite(motorPin3, LOW);
+      digitalWrite(motorPin4, LOW);
+      break;
+    case 7:
+      digitalWrite(motorPin1, HIGH);
+      digitalWrite(motorPin2, LOW);
+      digitalWrite(motorPin3, LOW);
+      digitalWrite(motorPin4, HIGH);
+      break;
+    default:
+      digitalWrite(motorPin1, LOW);
+      digitalWrite(motorPin2, LOW);
+      digitalWrite(motorPin3, LOW);
+      digitalWrite(motorPin4, LOW);
+      break;
+    }
+    setDirection();
   }
 }
 
@@ -235,4 +286,10 @@ void setDirection() {
 }
 
 
+
+// TURN MOTOR CODE 
+//  directionOfMotor = true;
+//      lockDoor(); //unlock first
+//      delay(3000);  
+//      lockDoor(); //lock now
 
